@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI ChatBot</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="{{ url_for('static', filename='style.css') }}"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div class="container">
+      <h1>AI ChatBot</h1>
+
+      {% if chat_history %}
+      <div class="chat-box">
+        {% for msg in chat_history %}
+        <div class="message user">
+          <p><strong>You:</strong> {{ msg.user }}</p>
+        </div>
+        <div class="message bot">
+          <p><strong>Bot:</strong> {{ msg.bot }}</p>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+      <br /><br />
+      <form method="POST">
+        <input
+          type="text"
+          name="user_input"
+          placeholder="Type your message..."
+          required
+        />
+        <button type="submit">Send</button>
+      </form>
+    </div>
+  </body>
+</html>
