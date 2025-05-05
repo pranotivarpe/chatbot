@@ -2,35 +2,41 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>AI ChatBot</title>
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap"
-      rel="stylesheet"
-    />
-    <link
-      href="{{ url_for('static', filename='style.css') }}"
-      rel="stylesheet"
-    />
+    <link rel="stylesheet" href="/static/style.css" />
   </head>
   <body>
     <div class="container">
+      <!-- Header -->
       <h1>AI ChatBot</h1>
 
-      {% if chat_history %}
+      <!-- Static search bar -->
+      <form method="GET" class="search-bar">
+        <input
+          type="text"
+          name="search"
+          placeholder="Search messages..."
+          value="{{ search_query }}"
+        />
+        <button type="submit">Search</button>
+      </form>
+
+      <!-- Scrollable chat area -->
       <div class="chat-box">
-        {% for msg in chat_history %}
+        {% if chat_history %} {% for chat in chat_history %}
         <div class="message user">
-          <p><strong>You:</strong> {{ msg.user }}</p>
+          <strong>You:</strong> {{ chat.user_message }}
         </div>
         <div class="message bot">
-          <p><strong>Bot:</strong> {{ msg.bot }}</p>
+          <strong>Bot:</strong> {{ chat.bot_response }}
         </div>
-        {% endfor %}
+        {% endfor %} {% else %}
+        <p class="empty">No chat history found.</p>
+        {% endif %}
       </div>
-      {% endif %}
-      <br /><br />
-      <form method="POST">
+
+      <!-- Static input bar -->
+      <form method="POST" class="input-bar">
         <input
           type="text"
           name="user_input"
