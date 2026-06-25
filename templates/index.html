@@ -2,49 +2,413 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>AI ChatBot</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="/static/style.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" />
   </head>
   <body>
     <div class="container">
-      <!-- Header -->
-      <h1>AI ChatBot</h1>
 
-      <!-- Static search bar -->
-      <form method="GET" class="search-bar">
-        <input
-          type="text"
-          name="search"
-          placeholder="Search messages..."
-          value="{{ search_query }}"
-        />
-        <button type="submit">Search</button>
-      </form>
-
-      <!-- Scrollable chat area -->
-      <div class="chat-box">
-        {% if chat_history %} {% for chat in chat_history %}
-        <div class="message user">
-          <strong>You:</strong> {{ chat.user_message }}
+      <div class="header">
+        <span class="header-title">AI ChatBot</span>
+        <div class="header-right">
+          <button type="button" class="theme-toggle" id="theme-toggle" title="Toggle dark mode">🌙</button>
+          <span class="header-user">
+            Hi, {{ current_user.username }} &nbsp;|&nbsp;
+            <a href="/logout" class="logout-link">Logout</a>
+          </span>
         </div>
-        <div class="message bot">
-          <strong>Bot:</strong> {{ chat.bot_response }}
-        </div>
-        {% endfor %} {% else %}
-        <p class="empty">No chat history found.</p>
-        {% endif %}
       </div>
 
-      <!-- Static input bar -->
-      <form method="POST" class="input-bar">
-        <input
-          type="text"
-          name="user_input"
-          placeholder="Type your message..."
-          required
-        />
-        <button type="submit">Send</button>
-      </form>
+      <div class="app-layout">
+
+        <!-- Sidebar -->
+        <div class="sidebar">
+          <form action="/session/new" method="POST" class="new-chat-form">
+            <button type="submit" class="new-chat-btn">+ New Chat</button>
+          </form>
+          <div class="session-list">
+            {% for s in sessions %}
+            <div class="session-item {% if s.id == active_session_id %}active{% endif %}">
+              <a href="/?s={{ s.id }}" class="session-link" title="{{ s.title }}">{{ s.title }}</a>
+              <form action="/session/{{ s.id }}/delete" method="POST">
+                <button type="submit" class="delete-btn" title="Delete">×</button>
+              </form>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+
+        <!-- Chat area -->
+        <div class="chat-area">
+
+          <form method="GET" class="search-bar">
+            <input type="text" name="search" placeholder="🔍  Search messages..."
+              value="{{ search_query }}" />
+            <input type="hidden" name="s" value="{{ active_session_id }}" />
+            <button type="submit">Search</button>
+          </form>
+
+          {% if error %}
+          <div class="error-banner">{{ error }}</div>
+          {% endif %}
+
+          <!-- Document bar -->
+          <div class="doc-bar">
+            <div class="doc-status" id="doc-status">
+              {% if active_doc %}
+              <span class="doc-pill">
+                📄 {{ active_doc.filename }}
+                <button type="button" class="doc-remove" id="doc-remove">×</button>
+              </span>
+              {% else %}
+              <span class="doc-none">No document attached</span>
+              {% endif %}
+            </div>
+            <label class="upload-btn" for="pdf-upload">📎 Upload PDF</label>
+            <input type="file" id="pdf-upload" accept=".pdf" hidden />
+          </div>
+
+          <!-- Persona bar -->
+          <div class="persona-bar">
+            <button type="button" class="persona-toggle" id="persona-btn">
+              ⚡ Bot Persona: <span id="persona-name">{{ 'Custom' if active_system_prompt else 'Default' }}</span>
+            </button>
+          </div>
+
+          <div class="chat-box" id="chat-box">
+            {% if chat_history %}
+              {% for chat in chat_history %}
+              <div class="message user">
+                <span class="msg-text">{{ chat.user_message }}</span>
+              </div>
+              <div class="message bot">
+                <span class="msg-text">{{ chat.bot_response }}</span>
+              </div>
+              {% if chat.created_at %}
+              <div class="msg-timestamp">{{ chat.created_at.strftime('%-I:%M %p') }}</div>
+              {% endif %}
+              {% endfor %}
+            {% else %}
+            <div class="empty" id="empty-msg">
+              <div class="empty-icon">✦</div>
+              <div class="empty-title">How can I help you today?</div>
+              <div class="empty-sub">Type a message below to start chatting.</div>
+            </div>
+            {% endif %}
+          </div>
+
+          <form class="input-bar" id="chat-form">
+            <input type="hidden" name="session_id" value="{{ active_session_id }}" />
+            <input type="text" name="user_input" id="user-input"
+              placeholder="Message AI ChatBot..." autocomplete="off" />
+            <button type="submit" id="send-btn">↑</button>
+          </form>
+
+        </div>
+      </div>
     </div>
+
+    <!-- Persona Modal -->
+    <div class="modal-overlay" id="persona-modal">
+      <div class="modal">
+        <div class="modal-header">
+          <span>⚡ Bot Persona</span>
+          <button type="button" class="modal-close" id="modal-close">×</button>
+        </div>
+        <div class="modal-body">
+          <p class="modal-desc">Define how the bot behaves in this conversation. Changes apply to all future messages.</p>
+          <p class="modal-label">Quick presets</p>
+          <div class="preset-grid">
+            <button type="button" class="preset-chip" data-key="Default">Default</button>
+            <button type="button" class="preset-chip" data-key="Code Expert">💻 Code Expert</button>
+            <button type="button" class="preset-chip" data-key="Creative Writer">✍️ Creative Writer</button>
+            <button type="button" class="preset-chip" data-key="Patient Tutor">📚 Patient Tutor</button>
+            <button type="button" class="preset-chip" data-key="Casual Friend">😊 Casual Friend</button>
+          </div>
+          <p class="modal-label modal-label-top">System prompt</p>
+          <textarea class="persona-textarea" id="persona-textarea" rows="5"
+            placeholder="You are a helpful assistant..."></textarea>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-cancel" id="modal-cancel">Cancel</button>
+          <button type="button" class="btn-save" id="modal-save">Save Persona</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script>
+      // Configure marked with highlight.js for syntax-colored code blocks
+      marked.use({
+        breaks: true,
+        gfm: true,
+        renderer: (() => {
+          const r = new marked.Renderer();
+          r.code = ({ text, lang }) => {
+            const validLang = lang && hljs.getLanguage(lang) ? lang : null;
+            const highlighted = validLang
+              ? hljs.highlight(text, { language: validLang }).value
+              : hljs.highlightAuto(text).value;
+            return `<pre><code class="hljs">${highlighted}</code></pre>`;
+          };
+          return r;
+        })()
+      });
+
+      function renderMarkdown(el) {
+        el.innerHTML = marked.parse(el.textContent || '');
+      }
+
+      // Render all existing bot messages as markdown on page load
+      document.querySelectorAll('.message.bot .msg-text').forEach(renderMarkdown);
+
+      const chatBox = document.getElementById('chat-box');
+      const form    = document.getElementById('chat-form');
+      const input   = document.getElementById('user-input');
+      const sendBtn = document.getElementById('send-btn');
+
+      chatBox.scrollTop = chatBox.scrollHeight;
+      input.focus();
+
+      // Enter to send — Shift+Enter reserved for future textarea upgrade
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          form.requestSubmit();
+        }
+      });
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const text = input.value.trim();
+        if (!text) return;
+
+        const empty = document.getElementById('empty-msg');
+        if (empty) empty.remove();
+
+        addMessage('user', text);
+        input.value = '';
+        sendBtn.disabled = true;
+        sendBtn.textContent = '•••';
+
+        const botDiv  = addTypingIndicator();
+        let streaming = false;
+        let botSpan   = null;
+        let fullText  = '';
+
+        try {
+          const formData = new FormData(form);
+          formData.set('user_input', text);
+
+          const res    = await fetch('/chat', { method: 'POST', body: formData });
+          const reader = res.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = '';
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop();
+
+            for (const line of lines) {
+              if (!line.startsWith('data: ')) continue;
+              try {
+                const data = JSON.parse(line.slice(6));
+
+                if (data.token) {
+                  if (!streaming) {
+                    botDiv.innerHTML = '<span class="msg-text"></span>';
+                    botDiv.classList.add('typing');
+                    botSpan = botDiv.querySelector('.msg-text');
+                    streaming = true;
+                  }
+                  fullText += data.token;
+                  botSpan.textContent = fullText;
+                  chatBox.scrollTop = chatBox.scrollHeight;
+                }
+
+                if (data.done && botSpan) {
+                  renderMarkdown(botSpan);
+                  const ts   = new Date().toLocaleTimeString('en-US', {hour: 'numeric', minute: '2-digit'});
+                  const tsEl = document.createElement('div');
+                  tsEl.className = 'msg-timestamp';
+                  if (data.usage) {
+                    tsEl.innerHTML = `${ts} &nbsp;·&nbsp; <span class="token-count">↩ ${data.usage.completion} tokens</span>`;
+                  } else {
+                    tsEl.textContent = ts;
+                  }
+                  chatBox.appendChild(tsEl);
+                  chatBox.scrollTop = chatBox.scrollHeight;
+                }
+
+                if (data.title) {
+                  const link = document.querySelector('.session-item.active .session-link');
+                  if (link) link.textContent = data.title;
+                }
+
+                if (data.error) {
+                  botDiv.innerHTML = `<span class="msg-text">${data.error}</span>`;
+                  botDiv.classList.add('error-msg');
+                }
+              } catch (_) {}
+            }
+          }
+        } catch (err) {
+          botDiv.innerHTML = '<span class="msg-text">Connection error. Please try again.</span>';
+          botDiv.classList.add('error-msg');
+        }
+
+        botDiv.classList.remove('typing');
+        sendBtn.disabled = false;
+        sendBtn.textContent = '↑';
+        input.focus();
+      });
+
+      function addMessage(type, text) {
+        const div = document.createElement('div');
+        div.className = `message ${type}`;
+        div.innerHTML = `<span class="msg-text">${text}</span>`;
+        chatBox.appendChild(div);
+        chatBox.scrollTop = chatBox.scrollHeight;
+        return div;
+      }
+
+      function addTypingIndicator() {
+        const div = document.createElement('div');
+        div.className = 'message bot';
+        div.innerHTML = '<span class="typing-dots"><span></span><span></span><span></span></span>';
+        chatBox.appendChild(div);
+        chatBox.scrollTop = chatBox.scrollHeight;
+        return div;
+      }
+
+      // ── Persona Modal ──────────────────────────────────────────────────────
+      const PRESETS = {
+        'Default':          '',
+        'Code Expert':      'You are an expert software engineer. Provide clear, production-ready code with explanations. Always wrap code in code blocks and focus on best practices.',
+        'Creative Writer':  'You are a creative writing assistant. Be imaginative, descriptive, and expressive. Help craft compelling stories, vivid characters, and beautiful prose.',
+        'Patient Tutor':    'You are a patient and encouraging tutor. Break down complex topics step by step, use relatable analogies, and adapt explanations to the learner\'s level.',
+        'Casual Friend':    'You are a friendly, casual chatbot. Use informal language, contractions, and light humor. Keep responses conversational and fun, like texting a close friend.'
+      };
+
+      const personaModal    = document.getElementById('persona-modal');
+      const personaTextarea = document.getElementById('persona-textarea');
+      const personaName     = document.getElementById('persona-name');
+      const activeSessionId = {{ active_session_id }};
+      let currentPrompt     = {{ active_system_prompt | tojson }};
+
+      document.getElementById('persona-btn').addEventListener('click', () => {
+        personaTextarea.value = currentPrompt || '';
+        updatePresetHighlight();
+        personaModal.classList.add('open');
+      });
+
+      document.getElementById('modal-close').addEventListener('click', closeModal);
+      document.getElementById('modal-cancel').addEventListener('click', closeModal);
+      personaModal.addEventListener('click', (e) => { if (e.target === personaModal) closeModal(); });
+
+      function closeModal() { personaModal.classList.remove('open'); }
+
+      document.querySelectorAll('.preset-chip').forEach(btn => {
+        btn.addEventListener('click', () => {
+          personaTextarea.value = PRESETS[btn.dataset.key] || '';
+          updatePresetHighlight();
+        });
+      });
+
+      personaTextarea.addEventListener('input', updatePresetHighlight);
+
+      function updatePresetHighlight() {
+        const val = personaTextarea.value.trim();
+        document.querySelectorAll('.preset-chip').forEach(btn => {
+          const match = btn.dataset.key === 'Default' ? val === '' : PRESETS[btn.dataset.key] === val;
+          btn.classList.toggle('active', match);
+        });
+      }
+
+      document.getElementById('modal-save').addEventListener('click', async () => {
+        const prompt  = personaTextarea.value.trim();
+        const saveBtn = document.getElementById('modal-save');
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Saving…';
+        try {
+          const fd = new FormData();
+          fd.append('system_prompt', prompt);
+          await fetch(`/session/${activeSessionId}/persona`, { method: 'POST', body: fd });
+          currentPrompt = prompt;
+          personaName.textContent = prompt ? 'Custom' : 'Default';
+          closeModal();
+        } catch (_) {
+          alert('Failed to save persona. Please try again.');
+        }
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Save Persona';
+      });
+
+      // Highlight the active preset on first open
+      updatePresetHighlight();
+
+      // ── PDF upload / RAG ───────────────────────────────────────────────────
+      function attachDocRemove() {
+        const btn = document.getElementById('doc-remove');
+        if (!btn) return;
+        btn.addEventListener('click', async () => {
+          await fetch(`/session/${activeSessionId}/doc/remove`, { method: 'POST' });
+          document.getElementById('doc-status').innerHTML = '<span class="doc-none">No document attached</span>';
+        });
+      }
+      attachDocRemove();
+
+      document.getElementById('pdf-upload').addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const label = document.querySelector('.upload-btn');
+        label.textContent = 'Uploading…';
+        label.style.pointerEvents = 'none';
+
+        const fd = new FormData();
+        fd.append('pdf', file);
+        try {
+          const res  = await fetch(`/session/${activeSessionId}/upload`, { method: 'POST', body: fd });
+          const data = await res.json();
+          if (data.success) {
+            document.getElementById('doc-status').innerHTML =
+              `<span class="doc-pill">📄 ${data.filename}<button type="button" class="doc-remove" id="doc-remove">×</button></span>`;
+            attachDocRemove();
+          } else {
+            alert(data.error || 'Upload failed.');
+          }
+        } catch (_) {
+          alert('Upload failed. Please try again.');
+        }
+        label.textContent = '📎 Upload PDF';
+        label.style.pointerEvents = '';
+        e.target.value = '';
+      });
+
+      // ── Dark mode ──────────────────────────────────────────────────────────
+      const themeToggle = document.getElementById('theme-toggle');
+
+      function applyTheme(dark) {
+        document.body.classList.toggle('dark', dark);
+        themeToggle.textContent = dark ? '☀' : '🌙';
+      }
+
+      applyTheme(localStorage.getItem('theme') === 'dark');
+
+      themeToggle.addEventListener('click', () => {
+        const isDark = document.body.classList.toggle('dark');
+        themeToggle.textContent = isDark ? '☀' : '🌙';
+        localStorage.setItem('theme', isDark ? 'dark' : 'light');
+      });
+    </script>
   </body>
 </html>

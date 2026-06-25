@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Register — AI ChatBot</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/static/style.css" />
+  </head>
+  <body>
+    <div class="auth-wrapper">
+      <div class="auth-box">
+
+        <div class="auth-header">
+          <h2>AI ChatBot</h2>
+          <p class="auth-subtitle">Create a new account</p>
+        </div>
+
+        <div class="auth-body">
+          {% if error %}
+          <div class="auth-error">{{ error }}</div>
+          {% endif %}
+
+          <form method="POST" class="auth-form">
+            <input type="text" name="username" placeholder="Username" required autofocus />
+            <input type="password" name="password" placeholder="Password (min 6 chars)" required />
+            <button type="submit">Register</button>
+          </form>
+
+          <p class="auth-link">Already have an account? <a href="/login">Log In</a></p>
+        </div>
+
+      </div>
+    </div>
+  </body>
+</html>
