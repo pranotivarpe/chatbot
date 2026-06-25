@@ -17,21 +17,22 @@ client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY")
 
-db_pool = pooling.MySQLConnectionPool(
-    pool_name="chatpool",
-    pool_size=5,
-    host=os.getenv("DB_HOST"),
-    port=int(os.getenv("DB_PORT", "3306")),
-    user=os.getenv("DB_USER"),
-    password=os.getenv("DB_PASSWORD"),
-    database=os.getenv("DB_NAME"),
-    ssl_disabled=False,
-    ssl_verify_cert=False,
-    ssl_verify_identity=False
-)
+_db_pool = None
 
 def get_db():
-    return db_pool.get_connection()
+    global _db_pool
+    if _db_pool is None:
+        _db_pool = pooling.MySQLConnectionPool(
+            pool_name="chatpool",
+            pool_size=5,
+            host=os.getenv("DB_HOST"),
+            port=int(os.getenv("DB_PORT", "3306")),
+            user=os.getenv("DB_USER"),
+            password=os.getenv("DB_PASSWORD"),
+            database=os.getenv("DB_NAME"),
+            ssl_disabled=False
+        )
+    return _db_pool.get_connection()
 
 # Flask-Login setup
 login_manager = LoginManager()
