@@ -6,7 +6,10 @@ from groq import Groq
 from pypdf import PdfReader
 from dotenv import load_dotenv
 from mysql.connector import pooling
-import os, json, re, mysql.connector
+import os
+import json
+import re
+import mysql.connector
 
 load_dotenv()
 
@@ -172,31 +175,38 @@ def logout():
 @app.route("/session/new", methods=["POST"])
 @login_required
 def new_session():
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute(
-        "INSERT INTO chat_sessions (user_id, title) VALUES (%s, %s)",
-        (current_user.id, "New Chat")
-    )
-    conn.commit()
-    new_id = cur.lastrowid
-    cur.close()
-    conn.close()
-    return redirect(url_for("home", s=new_id))
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute(
+            "INSERT INTO chat_sessions (user_id, title) VALUES (%s, %s)",
+            (current_user.id, "New Chat")
+        )
+        conn.commit()
+        new_id = cur.lastrowid
+        cur.close()
+        conn.close()
+        return redirect(url_for("home", s=new_id))
+    except Exception as e:
+        app.logger.error(f"New session error: {e}")
+        return redirect(url_for("home"))
 
 
 @app.route("/session/<int:sid>/delete", methods=["POST"])
 @login_required
 def delete_session(sid):
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute(
-        "DELETE FROM chat_sessions WHERE id = %s AND user_id = %s",
-        (sid, current_user.id)
-    )
-    conn.commit()
-    cur.close()
-    conn.close()
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute(
+            "DELETE FROM chat_sessions WHERE id = %s AND user_id = %s",
+            (sid, current_user.id)
+        )
+        conn.commit()
+        cur.close()
+        conn.close()
+    except Exception as e:
+        app.logger.error(f"Delete session error: {e}")
     return redirect(url_for("home"))
 
 
@@ -458,7 +468,7 @@ def chat():
                 if chunk.usage:
                     usage_data = chunk.usage
                     continue
-                token = chunk.choices[0].delta.content or "" if chunk.choices else ""
+                token = (chunk.choices[0].delta.content or "") if chunk.choices else ""
                 if token:
                     full_response += token
                     yield f"data: {json.dumps({'token': token})}\n\n"
